@@ -1,11 +1,35 @@
 import os
 import sys
-from PyQt5.QtGui import QPainter, QPen
 from PyQt5.QtCore import QRect, Qt
 from PIL import Image
 import pytesseract
 from PyQt5.QtWidgets import QMainWindow, QVBoxLayout, QWidget, QLabel, QApplication, QLineEdit, QPushButton
-from PyQt5.QtGui import QPixmap
+from PyQt5.QtGui import QPixmap, QPainter, QPen
+import cv2
+
+
+# def recognize_character(image_path):
+#     """Nhận diện ký tự từ ảnh đã crop."""
+#     try:
+#         # Đọc ảnh bằng OpenCV
+#         image = cv2.imread(image_path)
+#
+#         # Chuyển ảnh sang dạng grayscale (đơn sắc)
+#         gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+#
+#         # Áp dụng threshold để làm rõ ký tự
+#         _, thresh_image = cv2.threshold(gray_image, 128, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+#
+#         # Lưu ảnh đã xử lý (nếu cần kiểm tra)
+#         cv2.imwrite("processed_image.png", thresh_image)
+#
+#         # Nhận diện ký tự bằng pytesseract
+#         text = pytesseract.image_to_string(thresh_image, lang='eng', config='--psm 10')
+#         # '--psm 10': Cấu hình Tesseract cho nhận diện ký tự đơn lẻ
+#
+#         return text.strip()
+#     except Exception as e:
+#         return f"Lỗi: {str(e)}"
 
 
 class PhoneController(QMainWindow):
@@ -13,7 +37,7 @@ class PhoneController(QMainWindow):
         super().__init__()
         self.coordinates = []  # Lưu chữ cái và tọa độ
         self.start_pos = None  # Điểm bắt đầu
-        self.end_pos = None    # Điểm kết thúc
+        self.end_pos = None  # Điểm kết thúc
         self.is_selecting = False  # Trạng thái khi đang chọn vùng
         self.initUI()
 
@@ -39,9 +63,7 @@ class PhoneController(QMainWindow):
         self.label.mouseReleaseEvent = self.mouseReleaseEvent
         self.label.mouseMoveEvent = self.mouseMoveEvent
 
-
         self.update_screen_image()
-
 
     def update_screen_image(self):
         # Chụp màn hình qua ADB
@@ -101,15 +123,46 @@ class PhoneController(QMainWindow):
 
             # Perform OCR
             custom_config = r'--psm 10'  # Single character mode
-            text = pytesseract.image_to_string(cropped, config=custom_config).strip()
-            print(f"Recognized text: {text}")
+            # text = self.recognize_character()recognize_character(cropped);
+            # print(f"Recognized text: {text}")
+            recognized_text = self.recognize_character("cropped.png")
+            print(f"Recognized text: {recognized_text}")
 
             # Save the text and coordinates
-            self.coordinates.append((text, (x, y, x + w, y + h)))
+            self.coordinates.append((recognized_text, (x, y, x + w, y + h)))
             print(f"Saved coordinates and text: {self.coordinates}")
 
         except Exception as e:
             print(f"An error occurred: {e}")
+
+    def recognize_character(self, image_path):
+        """
+        Nhận diện ký tự từ file ảnh.
+        """
+        try:
+            # Đọc ảnh bằng OpenCV
+            image = cv2.imread(image_path)
+
+            # Kiểm tra ảnh có tồn tại hay không
+            if image is None:
+                raise FileNotFoundError(f"Image not found: {image_path}")
+
+            # Chuyển ảnh sang dạng grayscale
+            gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+            # Áp dụng threshold để làm rõ ký tự
+            _, thresh_image = cv2.threshold(gray_image, 128, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+            # Lưu ảnh đã xử lý (tuỳ chọn kiểm tra)
+            cv2.imwrite("processed_image.png", thresh_image)
+
+            # Nhận diện ký tự bằng pytesseract
+            custom_config = r'--psm 10'  # Nhận diện ký tự đơn lẻ
+            text = pytesseract.image_to_string(thresh_image, lang='eng', config=custom_config)
+
+            return text.strip()  # Trả về ký tự nhận diện được
+        except Exception as e:
+            return f"Lỗi: {str(e)}"
 
     def execute_swipe(self):
         """Thực hiện vuốt dựa trên tọa độ và thứ tự nhập"""
