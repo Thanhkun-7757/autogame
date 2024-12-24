@@ -47,8 +47,9 @@ class PhoneController(QMainWindow):
         # Chụp màn hình qua ADB
         os.system("adb exec-out screencap -p > screen.png")
         pixmap = QPixmap("screen.png")
-        self.label.setPixmap(pixmap)
-        self.label.resize(pixmap.width(), pixmap.height()-500)
+        scaled_pixmap = pixmap.scaled(1000, 860, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        self.label.setPixmap(scaled_pixmap)
+        self.label.resize(scaled_pixmap.width(), scaled_pixmap.height())
 
     def mousePressEvent(self, event):
         """Bắt đầu chọn vùng trên ảnh"""
