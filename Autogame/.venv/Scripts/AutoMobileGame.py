@@ -41,9 +41,9 @@ class PhoneController(QMainWindow):
         self.check_connection_button.clicked.connect(self.check_device_connection)
         button_layout.addWidget(self.check_connection_button)
 
-        # Nút thực hiện vuốt
+        # Nút thực hiện chụp màn hình
         self.swipe_button = QPushButton("Chụp màn hình", self)
-        # self.swipe_button.clicked.connect(self.execute_swipe)
+        self.swipe_button.clicked.connect(self.capture_screen_and_show)
         button_layout.addWidget(self.swipe_button)
 
         # Thêm layout ngang vào layout chính
@@ -52,13 +52,46 @@ class PhoneController(QMainWindow):
         # Label để hiển thị màn hình thiết bị
         self.label = QLabel(self)
         layout.addWidget(self.label)
-        self.label.mousePressEvent = self.mousePressEvent
-        self.label.mouseReleaseEvent = self.mouseReleaseEvent
-        self.label.mouseMoveEvent = self.mouseMoveEvent
 
         # Kiểm tra kết nối thiết bị và bắt đầu cập nhật ảnh
         if self.check_device_connection():
             self.start_screen_update()
+
+    def capture_screen_and_show(self):
+        """Chụp màn hình thiết bị và hiển thị trong cửa sổ mới"""
+        try:
+            # Chụp màn hình
+            process = subprocess.Popen(['adb', 'exec-out', 'screencap', '-p'], stdout=subprocess.PIPE)
+            screenshot_data, _ = process.communicate()
+
+            if not screenshot_data:
+                self.show_message("Không thể chụp màn hình thiết bị. Kiểm tra kết nối ADB.", "Lỗi")
+                return
+
+            # Tạo cửa sổ mới
+            window = tk.Toplevel()
+            window.title("Ảnh chụp màn hình")
+            window.geometry("480x800")
+
+            # Hiển thị ảnh chụp màn hình
+            image = Image.open(BytesIO(screenshot_data))
+            image_resized = image.resize((480, 800), Image.Resampling.LANCZOS)
+            image_tk = ImageTk.PhotoImage(image_resized)
+
+            img_label = Label(window, image=image_tk)
+            img_label.image = image_tk  # Giữ tham chiếu để không bị xóa
+            img_label.pack(pady=10)
+
+            # Thêm nút đóng cửa sổ
+            close_button = Button(window, text="Đóng", command=window.destroy, font=("Arial", 12))
+            close_button.pack(pady=20)
+
+            # Hiển thị cửa sổ mới
+            window.mainloop()
+
+        except Exception as e:
+            print(f"Lỗi khi chụp màn hình: {e}")
+            self.show_message("Đã xảy ra lỗi khi chụp màn hình.", "Lỗi")
 
     def start_screen_update(self):
         """Bắt đầu cập nhật màn hình tự động"""
