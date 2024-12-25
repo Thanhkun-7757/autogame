@@ -1,5 +1,7 @@
 import os
 import sys
+from io import BytesIO
+
 from PyQt5.QtGui import QPainter, QPen
 from PIL import Image
 import pytesseract
@@ -9,12 +11,13 @@ from PyQt5.QtWidgets import QMessageBox
 import subprocess
 from PyQt5.QtCore import QRect, Qt, QTimer
 
+
 class PhoneController(QMainWindow):
     def __init__(self):
         super().__init__()
         self.coordinates = []  # Lưu chữ cái và tọa độ
         self.start_pos = None  # Điểm bắt đầu
-        self.end_pos = None    # Điểm kết thúc
+        self.end_pos = None  # Điểm kết thúc
         self.is_selecting = False  # Trạng thái khi đang chọn vùng
         self.initUI()
 
@@ -72,7 +75,8 @@ class PhoneController(QMainWindow):
             if screenshot_data:
                 pixmap = QPixmap()
                 pixmap.loadFromData(screenshot_data)
-                scaled_pixmap = pixmap.scaled(self.label.width(), self.label.height(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                scaled_pixmap = pixmap.scaled(self.label.width(), self.label.height(), Qt.KeepAspectRatio,
+                                              Qt.SmoothTransformation)
                 self.label.setPixmap(scaled_pixmap)
             else:
                 self.show_message("Không thể chụp màn hình thiết bị. Kiểm tra kết nối ADB.", "Lỗi")
