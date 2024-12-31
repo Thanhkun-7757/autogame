@@ -1,258 +1,139 @@
-import os
-import sys
-from io import BytesIO
 import tkinter as tk
-from tkinter import Label, Button
-from PyQt5.QtGui import QPainter, QPen
-from PIL import Image, ImageTk
-import pytesseract
-from PyQt5.QtWidgets import QMainWindow, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QApplication, QLineEdit, QPushButton
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QMessageBox
-import subprocess
-from PyQt5.QtCore import QRect, Qt, QTimer
-from Test import recognize_character
-class PhoneController(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.coordinates = []  # Lưu chữ cái và tọa độ
-        self.start_pos = None  # Điểm bắt đầu
-        self.end_pos = None    # Điểm kết thúc
-        self.is_selecting = False  # Trạng thái khi đang chọn vùng
-        self.initUI()
+from tkinter import messagebox
+from tkinter.simpledialog import askinteger
 
-    def initUI(self):
-        self.setWindowTitle("Điều khiển điện thoại")
-        self.setGeometry(100, 100, 480, 800)
-        self.central_widget = QWidget(self)
-        self.setCentralWidget(self.central_widget)
+# Mock data for installed apps
+installed_apps = {
+    "MÁY 1": ["Candy Crush", "Đào Vàng", "Câu Cá", "Bắn Cung", "Chụp Ảnh", "Con Mèo", "Con Chó", "Con Gà"],
+    "MÁY 2": ["Game A", "Game B", "Game C"],
+    "MÁY 3": ["Game D", "Game E"],
+    "MÁY 4": ["Game J"],
+    "MÁY 5": ["Game K", "Game L"],
+    "MÁY 6": []
+}
 
-        layout = QVBoxLayout(self.central_widget)
-        # Khung nhập chữ cái
-        self.input_line = QLineEdit(self)
-        self.input_line.setPlaceholderText("Nhập thứ tự chữ cái (VD: A B C)")
-        layout.addWidget(self.input_line)
+def add_game_action(machine_name, checkbox_var):
+    if checkbox_var.get():
+        # Create a new window for Bảng 2
+        table2_window = tk.Toplevel(root)
+        table2_window.title(f"Bảng 2: Installed Apps for {machine_name}")
 
-        # Layout ngang cho hai nút
-        button_layout = QHBoxLayout()
+        # Left frame for installed apps
+        left_frame = tk.Frame(table2_window)
+        left_frame.pack(side="left", fill="y", padx=10, pady=10)
 
-        # Nút kiểm tra kết nối
-        self.check_connection_button = QPushButton("Kiểm tra kết nối", self)
-        self.check_connection_button.clicked.connect(self.check_device_connection)
-        button_layout.addWidget(self.check_connection_button)
+        tk.Label(left_frame, text=f"Installed Apps for {machine_name}", font=("Arial", 12, "bold")).pack(pady=5)
 
-        # Nút thực hiện chụp màn hình
-        self.swipe_button = QPushButton("Chụp màn hình", self)
-        self.swipe_button.clicked.connect(self.capture_screen_and_show)
-        button_layout.addWidget(self.swipe_button)
+        # Right frame for selected apps
+        right_frame = tk.Frame(table2_window)
+        right_frame.pack(side="right", fill="both", expand=True, padx=10, pady=10)
 
-        # Thêm layout ngang vào layout chính
-        layout.addLayout(button_layout)
+        tk.Label(right_frame, text="Selected Apps", font=("Arial", 12, "bold")).pack(pady=5)
 
-        # Label để hiển thị màn hình thiết bị
-        self.label = QLabel(self)
-        layout.addWidget(self.label)
+        selected_apps_frame = tk.Frame(right_frame)
+        selected_apps_frame.pack(fill="both", expand=True)
 
-        # Kiểm tra kết nối thiết bị và bắt đầu cập nhật ảnh
-        if self.check_device_connection():
-            self.start_screen_update()
+        def add_to_selected(app_name):
+            row = tk.Frame(selected_apps_frame)
+            row.pack(fill="x", pady=2)
+            label = tk.Label(row, text=app_name, anchor="w", width=25)
+            label.pack(side="left", padx=5)
 
-    def capture_screen_and_show(self):
-        """Chụp màn hình thiết bị và hiển thị trong cửa sổ mới"""
-        try:
-            # Chụp màn hình
-            process = subprocess.Popen(['adb', 'exec-out', 'screencap', '-p'], stdout=subprocess.PIPE)
-            screenshot_data, _ = process.communicate()
+            remove_btn = tk.Button(row, text="Remove", command=lambda: row.destroy())
+            remove_btn.pack(side="right", padx=5)
 
-            if not screenshot_data:
-                self.show_message("Không thể chụp màn hình thiết bị. Kiểm tra kết nối ADB.", "Lỗi")
-                return
+            # Auto-remove after a set time
+            set_auto_remove(row)
 
-            # Tạo cửa sổ mới
-            window = tk.Toplevel()
-            window.title("Ảnh chụp màn hình")
-            window.geometry("480x800")
+        def set_auto_remove(row):
+            delay = askinteger("Set Time", "Enter time in seconds to auto-remove:")
+            if delay and delay > 0:
+                row.after(delay * 1000, lambda: row.destroy())
 
-            # Hiển thị ảnh chụp màn hình
-            image = Image.open(BytesIO(screenshot_data))
-            image_resized = image.resize((480, 800), Image.Resampling.LANCZOS)
-            image_tk = ImageTk.PhotoImage(image_resized)
+        def remove_all():
+            for widget in selected_apps_frame.winfo_children():
+                widget.destroy()
 
-            img_label = Label(window, image=image_tk)
-            img_label.image = image_tk  # Giữ tham chiếu để không bị xóa
-            img_label.pack(pady=10)
+        def load_installed_apps():
+            for widget in app_list_frame.winfo_children():
+                widget.destroy()
 
-            # Thêm nút đóng cửa sổ
-            close_button = Button(window, text="Đóng", command=window.destroy, font=("Arial", 12))
-            close_button.pack(pady=20)
+            apps = installed_apps.get(machine_name, [])
+            if apps:
+                for app in apps:
+                    app_frame = tk.Frame(app_list_frame)
+                    app_frame.pack(fill="x", pady=2)
 
-            # Hiển thị cửa sổ mới
-            window.mainloop()
-
-        except Exception as e:
-            print(f"Lỗi khi chụp màn hình: {e}")
-            self.show_message("Đã xảy ra lỗi khi chụp màn hình.", "Lỗi")
-
-    def start_screen_update(self):
-        """Bắt đầu cập nhật màn hình tự động"""
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_screen_image)
-        self.timer.start(1000)  # Làm mới mỗi 1000ms (1 giây)
-
-    def update_screen_image(self):
-        """Cập nhật màn hình thiết bị trực tiếp"""
-        try:
-            process = subprocess.Popen(['adb', 'exec-out', 'screencap', '-p'], stdout=subprocess.PIPE)
-            screenshot_data, _ = process.communicate()
-
-            if screenshot_data:
-                pixmap = QPixmap()
-                pixmap.loadFromData(screenshot_data)
-                scaled_pixmap = pixmap.scaled(self.label.width(), self.label.height(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
-                self.label.setPixmap(scaled_pixmap)
+                    tk.Label(app_frame, text=app, font=("Arial", 10), anchor="w").pack(side="left", padx=5)
+                    tk.Button(app_frame, text="Add", command=lambda a=app: add_to_selected(a)).pack(side="right")
             else:
-                self.show_message("Không thể chụp màn hình thiết bị. Kiểm tra kết nối ADB.", "Lỗi")
-        except Exception as e:
-            print(f"Lỗi khi lấy ảnh màn hình: {e}")
-            self.show_message("Đã xảy ra lỗi khi lấy ảnh màn hình.", "Lỗi")
+                tk.Label(app_list_frame, text="No apps installed.", font=("Arial", 10), anchor="w").pack(pady=2)
 
-    def show_message(self, message, title="Thông báo"):
-        """Hiển thị thông báo trong một hộp thoại riêng biệt"""
-        msg_box = QMessageBox(self)
-        msg_box.setIcon(QMessageBox.Information)
-        msg_box.setWindowTitle(title)
-        msg_box.setText(message)
-        msg_box.setStandardButtons(QMessageBox.Ok)
-        msg_box.exec_()
+        # Frame for the list of apps
+        app_list_frame = tk.Frame(left_frame)
+        app_list_frame.pack(fill="both", expand=True)
 
-    def check_device_connection(self):
-        """Kiểm tra kết nối với thiết bị qua ADB"""
-        result = os.popen("adb devices").read()  # Chạy lệnh adb devices và lấy kết quả
-        if "device" in result.splitlines()[1]:  # Kiểm tra nếu có thiết bị được liệt kê
-            self.show_message("Kết nối thành công với thiết bị!", "Thành công")
-            return True
-        else:
-            self.show_message("Không tìm thấy thiết bị. Vui lòng kiểm tra kết nối!", "Lỗi")
-            return False
+        # Populate initial apps
+        load_installed_apps()
 
-    def mousePressEvent(self, event):
-        """Bắt đầu chọn vùng trên ảnh"""
-        self.start_pos = event.pos()
-        self.is_selecting = True
+        # Add "Load App Install" button
+        load_btn = tk.Button(left_frame, text="Load App Install", bg="blue", fg="white", command=load_installed_apps)
+        load_btn.pack(pady=5)
 
-    def mouseMoveEvent(self, event):
-        """Di chuyển chuột và vẽ hình chữ nhật trong khi chọn"""
-        if self.is_selecting and self.start_pos:
-            self.end_pos = event.pos()
-            self.update()
+        # Add Remove All button
+        tk.Button(right_frame, text="Remove All", bg="red", command=remove_all).pack(pady=5)
+    else:
+        messagebox.showwarning("Warning", f"Please select the checkbox for {machine_name} to proceed.")
 
-    def mouseReleaseEvent(self, event):
-        """Kết thúc chọn vùng và xử lý OCR"""
-        self.end_pos = event.pos()
-        self.is_selecting = False
-        self.recognize_text(QRect(self.start_pos, self.end_pos))
-        self.start_pos = None
-        self.end_pos = None
-        self.update()
+def toggle_run_stop(button, machine_name):
+    if button["text"] == "RUN":
+        button.config(text="STOP", bg="red")
+        messagebox.showinfo("Action", f"Game started for {machine_name}")
+    else:
+        button.config(text="RUN", bg="green")
+        messagebox.showinfo("Action", f"Game stopped for {machine_name}")
 
-    def paintEvent(self, event):
-        """Vẽ hình chữ nhật khi di chuyển chuột"""
-        if self.is_selecting and self.start_pos and self.end_pos:
-            painter = QPainter(self.label.pixmap())
-            pen = QPen(Qt.red, 2, Qt.SolidLine)
-            painter.setPen(pen)
-            rect = QRect(self.start_pos, self.end_pos)
-            painter.setBrush(Qt.transparent)
-            painter.drawRect(rect)
-            painter.end()
-            self.label.update()
+# Initialize the main window (Bảng 1)
+root = tk.Tk()
+root.title("TOOLS AUTO CHANGE GAME - Bảng 1")
 
-    def recognize_text(self, rect):
-        """Nhận diện chữ từ vùng được chọn và hiển thị lên hộp thoại mới"""
-        try:
-            pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-            print("start reco")
-            x, y, w, h = rect.x(), rect.y(), rect.width(), rect.height()
-            process = subprocess.Popen(['adb', 'exec-out', 'screencap', '-p'], stdout=subprocess.PIPE)
-            screenshot_data, _ = process.communicate()
+# Bảng 1
+header_frame = tk.Frame(root)
+header_frame.pack(pady=10)
 
-            image = Image.open(BytesIO(screenshot_data))
-            # cropped = image.crop((x, y, x + w, y + h))
+tk.Label(header_frame, text="TÊN MÁY", width=20, font=("Arial", 12, "bold")).grid(row=0, column=1)
+tk.Label(header_frame, text="TIẾN TRÌNH", width=30, font=("Arial", 12, "bold")).grid(row=0, column=2)
+tk.Label(header_frame, text="", width=20).grid(row=0, column=3)  # Spacer
+tk.Label(header_frame, text="", width=20).grid(row=0, column=4)  # Spacer
 
-            # Nhận diện ký tự
-            text = recognize_character(image)
-            print('reco text :', text)
+machines = ["MÁY 1", "MÁY 2", "MÁY 3", "MÁY 4", "MÁY 5", "MÁY 6"]
 
-            # Thêm tọa độ và ký tự vào danh sách
-            self.coordinates.append((text, (x, y, x + w, y + h)))
+for machine in machines:
+    row_frame = tk.Frame(root)
+    row_frame.pack(fill="x", pady=5)
 
-            # Hiển thị hộp thoại với ảnh đã chọn và thông tin
-            self.show_result_dialog(image, text, (x, y, x + w, y + h))
+    # Checkbox
+    checkbox_var = tk.BooleanVar()
+    checkbox = tk.Checkbutton(row_frame, variable=checkbox_var)
+    checkbox.grid(row=0, column=0, padx=5)
 
-        except Exception as e:
-            print(f"An error occurred: {e}")
+    # Machine name
+    machine_label = tk.Label(row_frame, text=machine, width=20, anchor="w", font=("Arial", 10))
+    machine_label.grid(row=0, column=1)
 
-    def show_result_dialog(self, cropped_image, detected_text, coordinates):
-        """Hiển thị hộp thoại với ảnh, ký tự và tọa độ."""
-        # Tạo một cửa sổ mới
-        window = tk.Toplevel()
-        window.title("Kết quả nhận diện")
-        window.geometry("400x500")
+    # Status
+    status_label = tk.Label(row_frame, text="ĐANG CHẠY GAME THỨ BAO NHIÊU", width=30, anchor="w", font=("Arial", 10))
+    status_label.grid(row=0, column=2)
 
-        # Hiển thị ảnh đã chọn
-        image_resized = cropped_image.resize((300, 300), Image.Resampling.LANCZOS)
-        image_tk = ImageTk.PhotoImage(image_resized)
-        img_label = Label(window, image=image_tk)
-        img_label.image = image_tk  # Giữ tham chiếu để không bị xóa
-        img_label.pack(pady=10)
+    # Add Game Button
+    add_game_btn = tk.Button(row_frame, text="Add Game", bg="yellow",
+                             command=lambda m=machine, v=checkbox_var: add_game_action(m, v))
+    add_game_btn.grid(row=0, column=3, padx=5)
 
-        # Hiển thị ký tự nhận diện được
-        text_label = Label(window, text=f"Ký tự phát hiện: {detected_text}", font=("Arial", 14), wraplength=350)
-        text_label.pack(pady=10)
+    # Run/Stop Button
+    run_stop_btn = tk.Button(row_frame, text="RUN", bg="green")
+    run_stop_btn.config(command=lambda b=run_stop_btn, m=machine: toggle_run_stop(b, m))
+    run_stop_btn.grid(row=0, column=4, padx=5)
 
-        # Hiển thị tọa độ của vùng chọn
-        coordinates_label = Label(window, text=f"Tọa độ: {coordinates}", font=("Arial", 12))
-        coordinates_label.pack(pady=10)
-
-        # Thêm nút đóng hộp thoại
-        close_button = Button(window, text="Đóng", command=window.destroy, font=("Arial", 12))
-        close_button.pack(pady=20)
-
-        # Hiển thị hộp thoại
-        window.mainloop()
-
-    def execute_swipe(self):
-        """Thực hiện vuốt dựa trên tọa độ và thứ tự nhập"""
-        order = self.input_line.text().split()
-        if not order:
-            self.show_message("Vui lòng nhập thứ tự chữ cái!")
-            return
-
-        try:
-            swipe_points = []
-            for ch in order:
-                coord = next((coord for letter, coord in self.coordinates if letter == ch), None)
-                if coord is None:
-                    self.show_message(f"Không tìm thấy tọa độ cho chữ cái: {ch}")
-                    return
-                x1, y1, x2, y2 = coord
-                swipe_points.append(((x1 + x2) // 2, (y1 + y2) // 2))
-
-            for i in range(len(swipe_points) - 1):
-                x1, y1 = swipe_points[i]
-                x2, y2 = swipe_points[i + 1]
-                self.swipe(x1, y1, x2, y2)
-        except Exception as e:
-            print(f"An error occurred: {e}")
-
-    def swipe(self, x1, y1, x2, y2):
-        """Gửi lệnh vuốt qua ADB"""
-        command = f"adb shell input touchscreen swipe {x1} {y1} {x2} {y2} 300"
-        os.system(command)
-
-
-if __name__ == '__main__':
-    app = QApplication(sys.argv)
-    mainApp = PhoneController()
-    mainApp.show()
-    sys.exit(app.exec_())
+# Run the main loop
+root.mainloop()
